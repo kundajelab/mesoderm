@@ -1,0 +1,81 @@
+---
+title: "Batch effect correction for bulk RNA-seq"
+author: "Pang Wei Koh"
+date: "5/16/2016"
+output: html_document
+---
+
+This script uses ComBat to remove batch effects from the bulk RNA-seq data (which was generated in three batches) and visualizes the results.
+
+The script reads in values from bulk_tpm.txt, a TSV where each column is a sample and each row is a gene. 
+For your convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/bulk_tpm.txt.
+The batch correction procedure might take a few minutes to run.
+
+We first load in the data.
+
+```{r warning=FALSE, message=FALSE, results='hide'}
+library(sva)
+library(biomaRt)
+source('analysis.r')
+source('metadata.r')
+
+bulkTPMData <- read.table('bulk_tpm.txt', header = TRUE)
+
+# Remove celltypes in celltypesToExclude,
+# remove celltypes in experimentMetadata that aren't actually in countData,
+# and remove celltypes in countData that aren't in experimentMetadata.
+# Then take the log of the data for subsequent analysis.
+celltypesToExclude <- getCelltypesToExclude()
+bulkExperimentMetadata <- getExperimentMetadata()
+bulkExperimentMetadata <- filter(bulkExperimentMetadata,
+                                 !Celltype %in% celltypesToExclude,
+                                 SampleID %in% names(bulkTPMData))
+row.names(bulkExperimentMetadata) <- bulkExperimentMetadata$SampleID
+bulkTPMData <- dplyr::select(bulkTPMData,
+                             match(bulkExperimentMetadata$SampleID, names(bulkTPMData)))
+logBulkTPM <- log2(bulkTPMData + 1)
+
+# The order of samples in countData should now match those in experimentMetadata. 
+assert_that(all(bulkExperimentMetadata$SampleID == colnames(bulkTPMData)))
+```
+
+Next, we filter out all genes where the difference between the samples with the highest and lowest expression was less than 2 (in log2 TPM units, i.e., a 4-fold difference in expression).
+
+```{r warning=FALSE, message=FALSE}
+maxTPM <- apply(logBulkTPM, 1, max)
+minTPM <- apply(logBulkTPM, 1, min)
+logBulkTPM <- logBulkTPM[(maxTPM >= 2) & ((maxTPM - minTPM) >= 2), ]
+```
+
+We then use the ComBat algorithm, as implemented in the sva package, to remove batch effects. This sometimes results in small negative values for the corrected gene expressions, which we set to zero.
+
+```{r warning=FALSE, message=FALSE}
+TFExprSet <- ExpressionSet(
+  assayData = as.matrix(logBulkTPM),
+  phenoData = new(
+    "AnnotatedDataFrame", 
+    data = bulkExperimentMetadata))
+
+phenoData <- pData(TFExprSet)
+batch <- phenoData$Batch
+modcombat <- model.matrix(~as.factor(Celltype), data = phenoData)
+combatExpr <- ComBat(
+  dat = exprs(TFExprSet), 
+  batch = batch, 
+  mod = modcombat, 
+  par.prior = FALSE, 
+  prior.plots = FALSE)
+combatExpr[combatExpr < 0] <- 0
+```
+
+This is the PCA plot of the samples before batch correction. You can see that the hESC / APS / MPS samples are quite separated between batches 1 and 3. The somites, dermomyotome, and sclerotome from batch 2 are also distinct.
+
+```{r warning=FALSE, message=FALSE, results='hide'}
+PCA(t(logBulkTPM), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+```
+
+After batch correction, the different cell types cluster more tightly. As expected, cell types that are more highly differentiated (Somites, Dermomyotome, Sclerotome) are more dispersed.
+
+```{r warning=FALSE, message=FALSE, results='hide'}
+PCA(t(combatExpr), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+```
