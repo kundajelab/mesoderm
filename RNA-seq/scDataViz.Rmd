@@ -1,0 +1,88 @@
+---
+title: "Visualization of scRNA-seq data"
+author: "Pang Wei Koh"
+date: "5/19/2016"
+output: html_document
+---
+
+The script reads in values from sc_tpm.txt, a TSV where each column is a sample and each row is a gene. 
+For convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/sc_tpm.txt.
+
+We first load in the data, filtering out all genes that don't have at least 10 TPM in at least 20 cells.
+
+```{r warning=FALSE, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(assertthat)
+library(reshape2)
+
+source('analysis.r')
+source('metadata.r')
+scExperimentMetadata <- getScExperimentMetadata()
+celltypesToExclude <- getCelltypesToExclude()
+celltypesToCompare <- getCelltypesToCompare()
+
+minTPM <- 10
+minCellsWithMinTPM <- 20
+scTPMData <- read.table('sc_tpm.txt', header = TRUE)
+
+idxToKeep <- which(rowSums(scTPMData >= minTPM) >= minCellsWithMinTPM)
+scTPMData <- scTPMData[idxToKeep, ]
+logScTPM <- log2(scTPMData + 1)
+```
+
+Then, we use the top 500 genes by variance to make a PCA plot of the data.
+The data separates by cell type, which is expected; we note that this is perfectly confounded with batch, in the sense that 
+each cell type was loaded onto a different Fluidgm C1 chip. Cell types that are closer to each other biologically (and temporally) tend 
+to cluster more closely together.
+
+```{r warning=FALSE, message=FALSE}
+numTopGenes <- 500
+idxOfTop <- order(apply(logScTPM, 1, var), decreasing = TRUE)[1:numTopGenes]
+
+topTPM <- logScTPM[idxOfTop, ]
+pca <- PCA(t(topTPM), scExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype'))
+```
+
+As a sanity check, we verify that the TPM values are roughly log-normal in distribution, after removing zeros (which tend to be inflated because of a dropout effect).
+
+```{r message=FALSE}
+densityDf <- melt((scale(t(log2(scTPMData)))))
+
+ggplot(densityDf, aes(value)) + 
+  geom_density() +
+  theme_bw() +
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  stat_function(fun = dnorm, size = 0.5, color = "red") + 
+  xlab("Standardized log(TPM)") + 
+  ylab("Density")
+```
+
+Lastly, for each cell type, we plot the standard deviation of the expression of each gene against its average expression value. 
+
+```{r warning=FALSE, message=FALSE}
+for (celltype in c('D0 H7 hESC', 'D1 APS', 'D1 MPS', 'D2 DLL1+ PXM', 'D3 Somite', 'D5 Dermomyotome', 'D6 Sclerotome')){
+  
+  scIdxOfCelltype = (scExperimentMetadata$Celltype == celltype) 
+  logScTPMCelltype = logScTPM[, scIdxOfCelltype]
+  bulkIdxOfCelltype = (bulkExperimentMetadata$Celltype == celltype) 
+  logBulkTPMCelltype = logBulkTPM[, bulkIdxOfCelltype]
+  
+  statsToPlot = data.frame(
+    m = rowMeans(logScTPMCelltype),
+    stdev = apply(logScTPMCelltype, 1, sd))
+  
+  p <- ggplot(statsToPlot, aes_string(x = "m", y = "stdev")) +
+    geom_point(size = 1, alpha = 0.40) +
+    theme(text = element_text(size=15)) +       
+    theme_bw() +
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +      
+    xlab("Average expression in single cells") +
+    ylab("Single cell variability")
+  
+  print(celltype)  
+  print(p)
+}
+```

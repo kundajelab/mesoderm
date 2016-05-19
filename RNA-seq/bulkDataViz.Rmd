@@ -15,7 +15,6 @@ We first load in the data.
 
 ```{r warning=FALSE, message=FALSE, results='hide'}
 library(sva)
-library(biomaRt)
 source('analysis.r')
 source('metadata.r')
 
@@ -68,14 +67,22 @@ combatExpr <- ComBat(
 combatExpr[combatExpr < 0] <- 0
 ```
 
-This is the PCA plot of the samples before batch correction. You can see that the hESC / APS / MPS samples are quite separated between batches 1 and 3. The somites, dermomyotome, and sclerotome from batch 2 are also distinct.
+This is the PCA plot of the samples before batch correction, using the top 500 genes by variance. You can see that the hESC / APS / MPS samples are quite separated between batches 1 and 3; the somites, dermomyotome, and sclerotome also differ between batches.
 
 ```{r warning=FALSE, message=FALSE, results='hide'}
-PCA(t(logBulkTPM), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+numTopGenes <- 500
+idxOfTop <- order(apply(logBulkTPM, 1, var), decreasing = TRUE)[1:numTopGenes]
+PCA(t(logBulkTPM[idxOfTop, ]), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
 ```
 
 After batch correction, the different cell types cluster more tightly. As expected, cell types that are more highly differentiated (Somites, Dermomyotome, Sclerotome) are more dispersed.
 
 ```{r warning=FALSE, message=FALSE, results='hide'}
-PCA(t(combatExpr), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+numTopGenes <- 500
+idxOfTop <- order(apply(combatExpr, 1, var), decreasing = TRUE)[1:numTopGenes]
+PCA(t(combatExpr[idxOfTop, ]), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+```
+
+```{r}
+sessionInfo()
 ```
