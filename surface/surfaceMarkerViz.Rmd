@@ -1,0 +1,51 @@
+---
+title: "Visualization of surface marker data"
+author: "Pang Wei Koh"
+date: "5/24/2016"
+output: html_document
+---
+
+The script reads in values from surface_markers.csv, a CSV where each column is a cell type and each row is a surface marker. 
+For convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/surface_markers.csv.
+
+We first load in the data, filtering out all surface markers that are homogeneously expressed (or not expressed) across
+all cell types. We use an arbitrary threshold of 30% for the purposes of data visualization.
+
+```{r warning=FALSE, message=FALSE}
+library(RColorBrewer)
+library(gplots)
+
+markerData <- read.csv('surface_markers.csv', header = TRUE)
+rownames(markerData) <- markerData[, 1]
+markerData <- markerData[, -1]
+colnames(markerData) <- c("D0 hESC", "D1 APS", "D2 PXM", "D3 Somite", "D5 Dermo", "D6 Sclero", "D3 Cardiac")
+
+threshold <- 30
+maxMarker <- apply(markerData, 1, max)
+minMarker <- apply(markerData, 1, min)
+idxToKeep <- (minMarker < 100-threshold) & (maxMarker > threshold)
+```
+
+We then use the remaining surface markers to construct a heat map, keeping the original order of the cell types:
+```{r warning=FALSE, message=FALSE}
+
+hmcol <- colorRampPalette(brewer.pal(9, "YlGn"))(100)
+markerHeatmap <- heatmap.2(as.matrix(markerData[idxToKeep, ]),
+          col = hmcol,
+          Colv = FALSE,
+          dendrogram = 'none',
+          trace = 'none',
+          key = TRUE,
+          density.info = 'none',
+          margin = c(12, 10)
+)
+```
+
+These are the row names (names of surface markers), in order from top to bottom:
+```{r}
+rev(rownames(markerData[idxToKeep, ])[markerHeatmap[['rowInd']]])
+```
+
+```{r}
+sessionInfo()
+```

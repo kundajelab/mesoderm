@@ -86,3 +86,7 @@ for (celltype in c('D0 H7 hESC', 'D1 APS', 'D1 MPS', 'D2 DLL1+ PXM', 'D3 Somite'
   print(p)
 }
 ```
+
+```{r}
+sessionInfo()
+```
