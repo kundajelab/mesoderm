@@ -1,6 +1,6 @@
 # Human mesoderm differentiation
 This repository contains scripts for dataset processing and QC for the mesoderm differentiation project.
-If you have questions, please contact Pang Wei Koh <pangwei@cs.stanford.edu>.
+If you have questions, please contact Pang Wei Koh (<pangwei@cs.stanford.edu>).
 
 ## RNA-seq
 bulkDataViz.Rmd and scDataViz.Rmd (together with their corresponding .html files) reproduce Figures 2
