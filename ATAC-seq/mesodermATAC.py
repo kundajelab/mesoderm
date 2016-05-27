@@ -6,13 +6,10 @@ import pandas as pd
 from multiprocessing import Pool
 import inspect
 
-
 PIPELINES_ROOT = "/users/pangwei/bds_atac"
 CODE_ROOT = "/users/pangwei/stemcells/mesoderm"
-COMBINED_DATA_ROOT = "/srv/scratch/pangwei/mesoderm/data/ATACseq-combined"
 DATA_ROOT = "/srv/scratch/pangwei/mesoderm/data/ATACseq"
 OUTPUT_ROOT = "/srv/scratch/pangwei/mesoderm/bulk-atac/output-hg19-scidata"
-
 GENOME_TYPE = "hg19"
 
 
