@@ -7,18 +7,20 @@ output: html_document
 
 This script uses ComBat to remove batch effects from the bulk RNA-seq data (which was generated in three batches) and visualizes the results.
 
-The script reads in values from bulk_tpm.txt, a TSV where each column is a sample and each row is a gene. 
-For your convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/bulk_tpm.txt.
+The script reads in values from bulk_tpm.csv, a TSV where each column is a sample and each row is a gene. 
+For your convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/RNA-seq/bulk_tpm.csv.
 The batch correction procedure might take a few minutes to run.
 
 We first load in the data.
 
 ```{r warning=FALSE, message=FALSE, results='hide'}
+library(Biobase)
 library(sva)
 source('analysis.r')
 source('metadata.r')
 
-bulkTPMData <- read.table('bulk_tpm.txt', header = TRUE)
+bulkTPMData <- read.csv('bulk_tpm.csv', header = TRUE)
+bulkTPMData <- bulkTPMData[, 3:ncol(bulkTPMData)] # Remove geneSymbol and geneID columns
 
 # Remove celltypes in celltypesToExclude,
 # remove celltypes in experimentMetadata that aren't actually in countData,
@@ -28,22 +30,26 @@ celltypesToExclude <- getCelltypesToExclude()
 bulkExperimentMetadata <- getExperimentMetadata()
 bulkExperimentMetadata <- filter(bulkExperimentMetadata,
                                  !Celltype %in% celltypesToExclude,
-                                 SampleID %in% names(bulkTPMData))
-row.names(bulkExperimentMetadata) <- bulkExperimentMetadata$SampleID
+                                 SRA %in% names(bulkTPMData))
+row.names(bulkExperimentMetadata) <- bulkExperimentMetadata$SRA
 bulkTPMData <- dplyr::select(bulkTPMData,
-                             match(bulkExperimentMetadata$SampleID, names(bulkTPMData)))
+                             match(bulkExperimentMetadata$SRA, names(bulkTPMData)))
 logBulkTPM <- log2(bulkTPMData + 1)
 
 # The order of samples in countData should now match those in experimentMetadata. 
-assert_that(all(bulkExperimentMetadata$SampleID == colnames(bulkTPMData)))
+assert_that(all(bulkExperimentMetadata$SRA == colnames(bulkTPMData)))
 ```
 
-Next, we filter out all genes where the difference between the samples with the highest and lowest expression was less than 2 (in log2 TPM units, i.e., a 4-fold difference in expression).
+Next, we filter out all genes where the difference between the samples with the highest and lowest expression was less than 2 (in log2 TPM units, i.e., a 4-fold difference in expression), and then take the top 500 genes by variance.
 
 ```{r warning=FALSE, message=FALSE}
 maxTPM <- apply(logBulkTPM, 1, max)
 minTPM <- apply(logBulkTPM, 1, min)
 logBulkTPM <- logBulkTPM[(maxTPM >= 2) & ((maxTPM - minTPM) >= 2), ]
+
+numTopGenes <- 500
+idxOfTop <- order(apply(logBulkTPM, 1, var), decreasing = TRUE)[1:numTopGenes]
+logBulkTPM <- logBulkTPM[idxOfTop, ]
 ```
 
 We then use the ComBat algorithm, as implemented in the sva package, to remove batch effects. This sometimes results in small negative values for the corrected gene expressions, which we set to zero.
@@ -70,17 +76,13 @@ combatExpr[combatExpr < 0] <- 0
 This is the PCA plot of the samples before batch correction, using the top 500 genes by variance. You can see that the hESC / APS / MPS samples are quite separated between batches 1 and 3; the somites, dermomyotome, and sclerotome also differ between batches.
 
 ```{r warning=FALSE, message=FALSE, results='hide'}
-numTopGenes <- 500
-idxOfTop <- order(apply(logBulkTPM, 1, var), decreasing = TRUE)[1:numTopGenes]
-PCA(t(logBulkTPM[idxOfTop, ]), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+PCA(t(logBulkTPM), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
 ```
 
 After batch correction, the different cell types cluster more tightly. As expected, cell types that are more highly differentiated (Somites, Dermomyotome, Sclerotome) are more dispersed.
 
 ```{r warning=FALSE, message=FALSE, results='hide'}
-numTopGenes <- 500
-idxOfTop <- order(apply(combatExpr, 1, var), decreasing = TRUE)[1:numTopGenes]
-PCA(t(combatExpr[idxOfTop, ]), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
+PCA(t(combatExpr), bulkExperimentMetadata, PCs=c(1,2), intgroup=c('Celltype', 'Batch'))
 ```
 
 ```{r}

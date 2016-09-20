@@ -5,8 +5,8 @@ date: "5/19/2016"
 output: html_document
 ---
 
-The script reads in values from sc_tpm.txt, a TSV where each column is a sample and each row is a gene. 
-For convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/sc_tpm.txt.
+The script reads in values from sc_tpm.csv, a CSV where each column is a sample and each row is a gene. 
+For convenience, you can download this file from http://mitra.stanford.edu/kundaje/pangwei/mesoderm_data/RNA-seq/sc_tpm.csv.
 
 We first load in the data, filtering out all genes that don't have at least 10 TPM in at least 20 cells.
 
@@ -24,7 +24,8 @@ celltypesToCompare <- getCelltypesToCompare()
 
 minTPM <- 10
 minCellsWithMinTPM <- 20
-scTPMData <- read.table('sc_tpm.txt', header = TRUE)
+scTPMData <- read.csv('sc_tpm.csv', header = TRUE)
+scTPMData <- scTPMData[, 3:ncol(scTPMData)] # Remove geneSymbol and geneID columns
 
 idxToKeep <- which(rowSums(scTPMData >= minTPM) >= minCellsWithMinTPM)
 scTPMData <- scTPMData[idxToKeep, ]
@@ -33,8 +34,8 @@ logScTPM <- log2(scTPMData + 1)
 
 Then, we use the top 500 genes by variance to make a PCA plot of the data.
 The data separates by cell type, which is expected; we note that this is perfectly confounded with batch, in the sense that 
-each cell type was loaded onto a different Fluidgm C1 chip. Cell types that are closer to each other biologically (and temporally) tend 
-to cluster more closely together.
+each cell type was loaded onto a different Fluidgm C1 chip. However, we note that cell types that 
+are closer to each other biologically (and temporally) tend to cluster more closely together.
 
 ```{r warning=FALSE, message=FALSE}
 numTopGenes <- 500
@@ -66,8 +67,6 @@ for (celltype in c('D0 H7 hESC', 'D1 APS', 'D1 MPS', 'D2 DLL1+ PXM', 'D3 Somite'
   
   scIdxOfCelltype = (scExperimentMetadata$Celltype == celltype) 
   logScTPMCelltype = logScTPM[, scIdxOfCelltype]
-  bulkIdxOfCelltype = (bulkExperimentMetadata$Celltype == celltype) 
-  logBulkTPMCelltype = logBulkTPM[, bulkIdxOfCelltype]
   
   statsToPlot = data.frame(
     m = rowMeans(logScTPMCelltype),

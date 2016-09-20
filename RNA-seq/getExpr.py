@@ -18,7 +18,7 @@ import IPython
 bulk_or_sc = 'sc'
 
 # bulk-RNA
-if bulk_or_sc == 'bulk':
+if bulk_or_sc == 'bulk':    
     outputRoot = "/srv/scratch/pangwei/mesoderm/bulk-rna/output"
     minUniquePercentage = 50
 elif bulk_or_sc == 'sc':
@@ -26,7 +26,6 @@ elif bulk_or_sc == 'sc':
     minUniquePercentage = 70
 
 # Common to both
-pipelinesRoot = "/users/pangwei/pipelines"
 outputFolder = "/users/pangwei/stemcells/mesoderm"
 minUniqueReads = 1000000
 foldersToInclude = [folder for folder in os.listdir(outputRoot) if os.path.isdir(os.path.join(outputRoot, folder))]
@@ -80,7 +79,7 @@ lengthCommand = ""
 
 # For each sample, append a column of the counts 
 for folder in filteredFolders:
-
+    
     resultsPath = os.path.join(
         outputRoot, 
         folder, 
@@ -93,6 +92,7 @@ for folder in filteredFolders:
     lengthCommand += " <(cut -f4 %s | tail -n +2)" % resultsPath
     print("Pasting results from %s" % resultsPath)
     
+
 # Concatenate folder names and add this as a header
 call("cat <(echo -e '%s') <(%s) > %s" % (
         '\t'.join(filteredFolders), 
@@ -101,14 +101,14 @@ call("cat <(echo -e '%s') <(%s) > %s" % (
     shell=True,
     executable="/bin/bash")
 
-# call("cat <(echo -e '%s') <(%s) > %s" % (
+call("cat <(echo -e '%s') <(%s) > %s" % (
         '\t'.join(filteredFolders), 
         pasteCommand + countCommand,
         os.path.join(outputFolder, "%s_expr.txt" % bulk_or_sc)), 
     shell=True,
     executable="/bin/bash")
 
-# call("cat <(echo -e '%s') <(%s) > %s" % (
+call("cat <(echo -e '%s') <(%s) > %s" % (
         '\t'.join(filteredFolders), 
         pasteCommand + lengthCommand,
         os.path.join(outputFolder, "%s_geneLengths.txt" % bulk_or_sc)), 
